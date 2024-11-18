@@ -1,6 +1,7 @@
-from fastapi import FastAPI, Body
+from fastapi import FastAPI, Body, Path, Query, HTTPException
 from pydantic import BaseModel, Field
 from typing import Optional
+from starlette import status
 
 app = FastAPI()
 
@@ -28,7 +29,7 @@ class BookRequest(BaseModel):
     author: str = Field(min_length=1)
     description: str = Field(min_length=1, max_length=100)
     rating: int = Field(gt=0, lt=6)
-    published_date: int
+    published_date: int = Field(gt=1999, lt=2031)
 
     # the code below will basically make a user defined example for any book requests that are made - can be seen on SwaggerUI (when the pydantic model of book request is made)
     model_config = {
@@ -52,33 +53,37 @@ BOOKS = [
     Book(6, 'HP3', 'Author 3', 'Book Description', 1, 2028)
 ]
 
-@app.get("/books")
+@app.get("/books", status_code=status.HTTP_200_OK)
 async def read_all_books():
     return BOOKS
 
-@app.get("/books/{published_date}")
-async def read_book_by_date(published_date:int):
-    books_to_return = []
-    for book in BOOKS:
-        if book.published_date == published_date:
-            books_to_return.append(book)
-    return books_to_return
-
-@app.get("/books/{book_id}")
-async def read_book(book_id:int):
+# Path parameter checks the parameter of the path to make sure it conforms with the needed values
+@app.get("/books/{book_id}", status_code=status.HTTP_200_OK)
+async def read_book(book_id: int = Path(gt=0)):
     for book in BOOKS:
         if book.id == book_id:
             return book
+    raise HTTPException(status_code=404, detail='Item not found')
 
-@app.get("/books/")
-async def read_book_by_rating(book_rating:int):
+# Query parameter checks the parameter of the query to see if what we're seacrching by is corect (same as path but this is more meant for filtering that is not done with variable within the path but the body instead)
+@app.get("/books/", status_code=status.HTTP_200_OK)
+async def read_book_by_rating(book_rating:int = Query(gt=0, lt=6)):
     books_to_return = []
     for book in BOOKS:
         if book.rating == book_rating:
             books_to_return.append(book)
     return books_to_return
 
-@app.post("/create-book")
+# Note: books/{integer value} is an endpoint SHARED by both getting books by the id and by the publishing date, so you should try to either add to the endpoint or essentially look into putting the endpoint you'd like to test above the current existing endpoint
+@app.get("/books/publish/{published_date}", status_code=status.HTTP_200_OK)
+async def read_books_by_publish_date(published_date: int = Path(gt=1999, lt=2031)):
+    books_to_return = []
+    for book in BOOKS:
+        if book.published_date == published_date:
+            books_to_return.append(book)
+    return books_to_return
+
+@app.post("/create-book", status_code=status.HTTP_201_CREATED)
 # BookRequest is a Pydantic model that will be used to validate the request body to fulfill the requirements of the API. We're saying here the our book_request is OF the same type as the pydantic model
 async def create_book(book_request:BookRequest):
     # **  takes the keys of a dictionary and uses them as parameter names, and their corresponding values as parameter values when passing them to a function or class
@@ -94,18 +99,23 @@ def find_book_id(book:Book):
         book.id = 1   
     return book   
 
-@app.put("/book/update_book")
+@app.put("/book/update_book", status_code=status.HTTP_204_NO_CONTENT)
 async def update_book(book:BookRequest):
+    book_changed = False
     for i in range(len(BOOKS)):
         if BOOKS[i].id == book.id:
             BOOKS[i] == book 
+            book_changed = True
+    if not book_changed:
+        raise HTTPException(status_code=404,detail='Item not found')
 
-
-@app.delete("/books/{book_id}")
-async def delete_book(book_id:int):
+@app.delete("/books/{book_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_book(book_id:int = Path(gt=0)):
+    book_changed = False
     for i in range(len(BOOKS)):
         if BOOKS[i].id == book_id:
             BOOKS.pop(i)
+            book_changed = True
             break
-
-
+    if not book_changed:
+        raise HTTPException(status_code=404, detail='Item not found')
