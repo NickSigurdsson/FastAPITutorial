@@ -10,14 +10,16 @@ class Book:
     author: str
     description: str
     rating: int
+    published_date: int
 
     # The constructor is a method that is called when an object is created from a class and it allows the class to initialize the attributes of the class.
-    def __init__(self, id, title, author, description, rating):
+    def __init__(self, id, title, author, description, rating, published_date):
         self.id = id
         self.title = title
         self.author = author
         self.description = description
         self.rating = rating
+        self.published_date = published_date
 
 # We are making a pydantic model as seen by the importing of "Base Model"
 class BookRequest(BaseModel):
@@ -26,6 +28,7 @@ class BookRequest(BaseModel):
     author: str = Field(min_length=1)
     description: str = Field(min_length=1, max_length=100)
     rating: int = Field(gt=0, lt=6)
+    published_date: int
 
     # the code below will basically make a user defined example for any book requests that are made - can be seen on SwaggerUI (when the pydantic model of book request is made)
     model_config = {
@@ -41,17 +44,25 @@ class BookRequest(BaseModel):
     }
 
 BOOKS = [
-    Book(1, 'Computer Science Pro', 'codingwithroby', 'A very nice book!', 5),
-    Book(2, 'Be Fast with FastAPI', 'codingwithroby', 'A great book!', 5),
-    Book(3, 'Master Endpoints', 'codingwithroby', 'A awesome book!', 5),
-    Book(4, 'HP1', 'Author 1', 'Book Description', 2),
-    Book(5, 'HP2', 'Author 2', 'Book Description', 3),
-    Book(6, 'HP3', 'Author 3', 'Book Description', 1)
+    Book(1, 'Computer Science Pro', 'codingwithroby', 'A very nice book!', 5, 2021),
+    Book(2, 'Be Fast with FastAPI', 'codingwithroby', 'A great book!', 5, 2021),
+    Book(3, 'Master Endpoints', 'codingwithroby', 'A awesome book!', 5, 2023),
+    Book(4, 'HP1', 'Author 1', 'Book Description', 2, 2024),
+    Book(5, 'HP2', 'Author 2', 'Book Description', 3, 2024),
+    Book(6, 'HP3', 'Author 3', 'Book Description', 1, 2028)
 ]
 
 @app.get("/books")
 async def read_all_books():
     return BOOKS
+
+@app.get("/books/{published_date}")
+async def read_book_by_date(published_date:int):
+    books_to_return = []
+    for book in BOOKS:
+        if book.published_date == published_date:
+            books_to_return.append(book)
+    return books_to_return
 
 @app.get("/books/{book_id}")
 async def read_book(book_id:int):
@@ -87,6 +98,14 @@ def find_book_id(book:Book):
 async def update_book(book:BookRequest):
     for i in range(len(BOOKS)):
         if BOOKS[i].id == book.id:
-            BOOKS[i] == book
+            BOOKS[i] == book 
+
+
+@app.delete("/books/{book_id}")
+async def delete_book(book_id:int):
+    for i in range(len(BOOKS)):
+        if BOOKS[i].id == book_id:
+            BOOKS.pop(i)
+            break
 
 
